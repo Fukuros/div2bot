@@ -8,6 +8,15 @@ import numpy as np
 from typing import Tuple, Optional, List, Dict
 import logging
 from dataclasses import dataclass
+import re
+
+# Try to import OCR
+try:
+    import pytesseract
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
+    logging.warning("pytesseract not available - OCR features disabled")
 
 logger = logging.getLogger(__name__)
 
@@ -266,3 +275,108 @@ class VisionDetector:
             return DetectionResult(detected=False, confidence=0.0)
 
         return self.detect_template(image, self.templates[template_name])
+
+    def read_hud_text(self, image: np.ndarray, region_percent: Tuple[float, float, float, float] = (0.0, 0.0, 0.3, 0.15)) -> str:
+        """
+        Read text from HUD region (typically top-left corner).
+
+        Args:
+            image: Source image (full screen)
+            region_percent: (x%, y%, width%, height%) of region to read
+                          Default is top-left 30% width, 15% height
+
+        Returns:
+            Extracted text as string (empty if OCR unavailable or no text found)
+        """
+        if not OCR_AVAILABLE:
+            logger.warning("OCR not available - cannot read HUD text")
+            return ""
+
+        # Extract region
+        h, w = image.shape[:2]
+        x1 = int(w * region_percent[0])
+        y1 = int(h * region_percent[1])
+        x2 = int(w * (region_percent[0] + region_percent[2]))
+        y2 = int(h * (region_percent[1] + region_percent[3]))
+
+        hud_region = image[y1:y2, x1:x2]
+
+        # Preprocess for better OCR
+        # Convert to grayscale
+        gray = cv2.cvtColor(hud_region, cv2.COLOR_BGR2GRAY)
+
+        # Increase contrast
+        gray = cv2.convertScaleAbs(gray, alpha=1.5, beta=0)
+
+        # Threshold to get white text on black background
+        _, binary = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+
+        # Use Tesseract to extract text
+        try:
+            text = pytesseract.image_to_string(binary, config='--psm 6')
+            text = text.strip()
+            logger.debug(f"HUD text extracted: '{text}'")
+            return text
+        except Exception as e:
+            logger.error(f"OCR error: {e}")
+            return ""
+
+    def parse_game_state_from_hud(self, hud_text: str) -> Dict[str, any]:
+        """
+        Parse game state information from HUD text.
+
+        Args:
+            hud_text: Text extracted from HUD
+
+        Returns:
+            Dictionary with parsed state information:
+            - 'action': Type of action available (enter_elevator, in_elevator, etc.)
+            - 'distance': Distance in meters (if applicable)
+            - 'floor': Current floor (if applicable)
+            - 'raw_text': Original text
+        """
+        result = {
+            'action': None,
+            'distance': None,
+            'floor': None,
+            'raw_text': hud_text
+        }
+
+        if not hud_text:
+            return result
+
+        # Normalize text (lowercase, remove extra whitespace)
+        text_lower = ' '.join(hud_text.lower().split())
+
+        # Detect "Enter the elevator X m" or "Enter elevator X m"
+        elevator_match = re.search(r'enter\s+(?:the\s+)?elevator\s+(\d+)\s*m', text_lower)
+        if elevator_match:
+            result['action'] = 'elevator_nearby'
+            result['distance'] = int(elevator_match.group(1))
+            logger.debug(f"Detected: Elevator {result['distance']}m away")
+            return result
+
+        # Detect "Enter elevator" or "Enter the elevator" (no distance = very close)
+        if 'enter' in text_lower and 'elevator' in text_lower:
+            result['action'] = 'elevator_interact'
+            result['distance'] = 0
+            logger.debug("Detected: Elevator interaction available")
+            return result
+
+        # Detect floor indicators like "Floor 10", "Level 5", etc.
+        floor_match = re.search(r'(?:floor|level)\s+(\d+)', text_lower)
+        if floor_match:
+            result['action'] = 'in_elevator'
+            result['floor'] = int(floor_match.group(1))
+            logger.debug(f"Detected: In elevator at floor {result['floor']}")
+            return result
+
+        # Detect "Summit" or similar end-game areas
+        if 'summit' in text_lower:
+            result['action'] = 'in_elevator'
+            result['floor'] = 'summit'
+            logger.debug("Detected: In elevator heading to Summit")
+            return result
+
+        logger.debug(f"Could not parse state from HUD text: '{hud_text}'")
+        return result

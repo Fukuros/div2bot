@@ -147,9 +147,28 @@ class ElevatorStateDetector:
         """
         self.vision = vision_detector
 
+    def get_game_state(self, screen: Any) -> dict:
+        """
+        Get current game state by reading HUD text.
+
+        Args:
+            screen: Screen capture image
+
+        Returns:
+            Dictionary with game state info (from parse_game_state_from_hud)
+        """
+        # Read HUD text from top-left corner
+        hud_text = self.vision.read_hud_text(screen)
+
+        # Parse the state
+        state = self.vision.parse_game_state_from_hud(hud_text)
+
+        return state
+
     def detect_elevator_prompt(self, screen: Any) -> bool:
         """
         Detect if elevator interaction prompt is visible.
+        Uses HUD text reading instead of color detection.
 
         Args:
             screen: Screen capture image
@@ -157,13 +176,14 @@ class ElevatorStateDetector:
         Returns:
             True if elevator prompt detected
         """
-        result = self.vision.detect_ui_element_by_color(screen, 'elevator_prompt')
-        return result.detected
+        state = self.get_game_state(screen)
+        # Elevator is nearby if action is 'elevator_nearby' or 'elevator_interact'
+        return state['action'] in ['elevator_nearby', 'elevator_interact']
 
     def detect_in_elevator(self, screen: Any) -> bool:
         """
         Detect if player is inside elevator.
-        This checks for UI elements specific to being in an elevator.
+        Uses HUD text reading to check for floor indicators.
 
         Args:
             screen: Screen capture image
@@ -171,13 +191,13 @@ class ElevatorStateDetector:
         Returns:
             True if inside elevator
         """
-        # Check for floor indicator UI
-        result = self.vision.detect_ui_element_by_color(screen, 'floor_indicator')
-        return result.detected
+        state = self.get_game_state(screen)
+        return state['action'] == 'in_elevator'
 
     def detect_other_players(self, screen: Any) -> bool:
         """
         Detect if other players are present.
+        Uses color detection for player name tags.
 
         Args:
             screen: Screen capture image
@@ -185,12 +205,13 @@ class ElevatorStateDetector:
         Returns:
             True if other players detected
         """
+        # Still use color detection for this since it's not in HUD text
         result = self.vision.detect_ui_element_by_color(screen, 'player_tag')
         return result.detected
 
     def detect_floor_number(self, screen: Any) -> Optional[str]:
         """
-        Attempt to detect current floor number.
+        Detect current floor number from HUD text.
 
         Args:
             screen: Screen capture image
@@ -198,7 +219,19 @@ class ElevatorStateDetector:
         Returns:
             Floor number as string, or None if not detected
         """
-        # This would require OCR implementation
-        # For now, return None
-        # TODO: Integrate pytesseract for OCR
-        return None
+        state = self.get_game_state(screen)
+        floor = state.get('floor')
+        return str(floor) if floor is not None else None
+
+    def get_elevator_distance(self, screen: Any) -> Optional[int]:
+        """
+        Get distance to elevator in meters.
+
+        Args:
+            screen: Screen capture image
+
+        Returns:
+            Distance in meters, or None if not available
+        """
+        state = self.get_game_state(screen)
+        return state.get('distance')

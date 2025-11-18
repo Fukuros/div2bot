@@ -61,7 +61,27 @@ class ElevatorBot:
         """Start the bot main loop."""
         logger.info("Starting elevator bot...")
         self.running = True
-        self.state_machine.transition_to(BotState.SEARCHING_ELEVATOR, "bot started")
+
+        # Detect initial state from HUD
+        logger.info("Detecting initial game state...")
+        screen = self.screen.capture()
+        game_state = self.state_detector.get_game_state(screen)
+
+        logger.info(f"Initial HUD text: '{game_state.get('raw_text', 'none')}'")
+        logger.info(f"Detected action: {game_state.get('action')}")
+
+        # Set initial bot state based on game state
+        if game_state['action'] == 'in_elevator':
+            logger.info("Already in elevator - starting in WAITING_IN_ELEVATOR state")
+            self.state_machine.transition_to(BotState.WAITING_IN_ELEVATOR, "initial state: in elevator")
+            self.state_machine.set_state_data('wait_start_time', time.time())
+        elif game_state['action'] in ['elevator_nearby', 'elevator_interact']:
+            distance = game_state.get('distance', 0)
+            logger.info(f"Elevator detected {distance}m away - starting in APPROACHING_ELEVATOR state")
+            self.state_machine.transition_to(BotState.APPROACHING_ELEVATOR, "initial state: elevator nearby")
+        else:
+            logger.info("No elevator detected - starting in SEARCHING_ELEVATOR state")
+            self.state_machine.transition_to(BotState.SEARCHING_ELEVATOR, "initial state: searching")
 
         try:
             while self.running:
@@ -153,24 +173,40 @@ class ElevatorBot:
 
     def handle_approaching_elevator(self, screen: np.ndarray):
         """Handle APPROACHING_ELEVATOR state."""
-        # Check if still seeing elevator prompt
-        if self.state_detector.detect_elevator_prompt(screen):
-            # Move towards elevator
-            move_duration = self.config['movement']['move_duration']
-            self.input.move_to_elevator(move_duration)
+        # Get current game state
+        game_state = self.state_detector.get_game_state(screen)
 
-            # Transition to entering
-            self.state_machine.transition_to(
-                BotState.ENTERING_ELEVATOR,
-                "approaching elevator"
-            )
-            time.sleep(self.action_delay)
+        # Check if still seeing elevator
+        if game_state['action'] in ['elevator_nearby', 'elevator_interact']:
+            distance = game_state.get('distance', 0)
+
+            # If close enough (0m or interaction available), try to enter
+            if distance == 0 or game_state['action'] == 'elevator_interact':
+                logger.info("Reached elevator - attempting to enter")
+                self.state_machine.transition_to(
+                    BotState.ENTERING_ELEVATOR,
+                    "reached elevator"
+                )
+            else:
+                # Still need to move closer
+                logger.info(f"Moving towards elevator ({distance}m away)")
+                move_duration = min(distance / 10.0, 2.0)  # Scale movement with distance
+                self.input.move_to_elevator(move_duration)
+                time.sleep(self.action_delay)
         else:
-            # Lost sight of elevator
-            self.state_machine.transition_to(
-                BotState.SEARCHING_ELEVATOR,
-                "lost elevator prompt"
-            )
+            # Lost sight of elevator or already in elevator
+            if game_state['action'] == 'in_elevator':
+                logger.info("Already in elevator!")
+                self.state_machine.transition_to(
+                    BotState.IN_ELEVATOR,
+                    "state corrected: already in elevator"
+                )
+            else:
+                logger.warning("Lost sight of elevator")
+                self.state_machine.transition_to(
+                    BotState.SEARCHING_ELEVATOR,
+                    "lost elevator prompt"
+                )
 
     def handle_entering_elevator(self, screen: np.ndarray):
         """Handle ENTERING_ELEVATOR state."""
@@ -314,28 +350,98 @@ class ElevatorBot:
         # Create a copy for visualization
         debug_frame = screen.copy()
 
+        # Get game state from HUD
+        game_state = self.state_detector.get_game_state(screen)
+
         # Add text overlay with state info
         state_text = self.state_machine.get_state_description()
         time_in_state = self.state_machine.get_time_in_state()
 
+        # Bot state
         cv2.putText(
             debug_frame,
-            f"State: {state_text}",
+            f"Bot State: {state_text}",
             (10, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
+            0.6,
             (0, 255, 0),
             2
         )
 
+        # Time in state
         cv2.putText(
             debug_frame,
             f"Time: {time_in_state:.1f}s",
             (10, 60),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
+            0.6,
             (0, 255, 0),
             2
+        )
+
+        # HUD text (game state)
+        hud_text = game_state.get('raw_text', 'none')[:50]  # Limit length
+        cv2.putText(
+            debug_frame,
+            f"HUD: {hud_text}",
+            (10, 90),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (255, 255, 0),
+            2
+        )
+
+        # Game action
+        action = game_state.get('action', 'unknown')
+        cv2.putText(
+            debug_frame,
+            f"Action: {action}",
+            (10, 120),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (255, 255, 0),
+            2
+        )
+
+        # Distance (if available)
+        distance = game_state.get('distance')
+        if distance is not None:
+            cv2.putText(
+                debug_frame,
+                f"Distance: {distance}m",
+                (10, 150),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (255, 255, 0),
+                2
+            )
+
+        # Floor (if available)
+        floor = game_state.get('floor')
+        if floor is not None:
+            cv2.putText(
+                debug_frame,
+                f"Floor: {floor}",
+                (10, 180),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (255, 255, 0),
+                2
+            )
+
+        # Draw HUD region rectangle (where we're reading from)
+        h, w = debug_frame.shape[:2]
+        hud_x1, hud_y1 = 0, 0
+        hud_x2, hud_y2 = int(w * 0.3), int(h * 0.15)
+        cv2.rectangle(debug_frame, (hud_x1, hud_y1), (hud_x2, hud_y2), (0, 255, 255), 2)
+        cv2.putText(
+            debug_frame,
+            "HUD Region",
+            (hud_x1 + 5, hud_y1 + 20),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 255, 255),
+            1
         )
 
         # Resize for display if needed

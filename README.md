@@ -15,21 +15,41 @@ This bot automates elevator usage in The Division 2 Summit mode:
 
 ## ✨ Features
 
+- **HUD Text Recognition**: Uses OCR to read game HUD for accurate state detection
 - **Active Search Pattern**: Automatically rotates camera and looks around for elevators
+- **Distance-Aware Navigation**: Reads distance from HUD and adjusts movement accordingly
 - **Resolution Independent**: Works at any screen resolution
 - **Window Mode Flexible**: Supports windowed and borderless modes
 - **Computer Vision Based**: Uses only screen capture (no memory reading or game hooks)
 - **Chat Command Integration**: Uses `/leave` command to exit when players join
 - **State Machine**: Intelligent state management for robust operation
 - **Configurable**: Extensive configuration options via YAML
-- **Debug Mode**: Visual feedback for troubleshooting
+- **Debug Mode**: Visual feedback with HUD text overlay for troubleshooting
 
 ## 🔧 Requirements
 
 - Python 3.8 or higher
 - Windows 10/11 (primary support) or Linux (experimental)
+- Tesseract OCR installed on your system
 - The Division 2 installed and running
 - Administrator/elevated privileges (for input simulation)
+
+### Installing Tesseract OCR
+
+**Windows:**
+1. Download the installer from: https://github.com/UB-Mannheim/tesseract/wiki
+2. Run the installer and remember the install path (usually `C:\Program Files\Tesseract-OCR`)
+3. Add Tesseract to your PATH environment variable
+
+**Linux:**
+```bash
+sudo apt-get install tesseract-ocr
+```
+
+**Mac:**
+```bash
+brew install tesseract
+```
 
 ## 📦 Installation
 
@@ -182,14 +202,26 @@ EXITING_ELEVATOR → Move out and leave group
 
 ## 🔍 How It Works
 
-### Vision Detection
+### HUD Text Recognition (Primary State Detection)
 
-The bot uses computer vision techniques to identify game elements:
+The bot reads text from the top-left corner of your screen (the HUD) using OCR:
+
+1. **Captures HUD Region**: Grabs top-left 30% x 15% of screen where game displays info
+2. **OCR Processing**: Uses Tesseract to read text like:
+   - "Enter the elevator 48m" → Bot knows elevator is 48m away
+   - "Enter elevator" → Bot knows it can interact
+   - "Floor 10" or "Summit" → Bot knows it's inside elevator
+3. **State Parsing**: Analyzes text to determine exact game state
+4. **Distance-Aware**: Adjusts movement based on actual distance shown
+
+This is **much more accurate** than color detection - the bot knows exactly what the game is telling the player!
+
+### Vision Detection (Secondary)
+
+The bot also uses computer vision for:
 
 1. **Color Detection**: Identifies UI elements by their characteristic colors
-   - Orange/yellow for interaction prompts
-   - White/blue for player tags
-   - Gray/white for floor indicators
+   - White/blue for player name tags (detecting other players in elevator)
 
 2. **Template Matching**: Can match saved template images for precise detection
 
