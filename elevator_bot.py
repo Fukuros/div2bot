@@ -129,7 +129,26 @@ class ElevatorBot:
                     "elevator prompt detected"
                 )
         else:
-            # Keep searching - could add simple movement pattern here
+            # Active search pattern - rotate camera and look around
+            search_step = self.state_machine.get_state_data('search_step', 0)
+            time_since_last_search = self.state_machine.get_state_data('last_search_time', 0)
+            current_time = time.time()
+
+            # Execute search pattern every 2 seconds
+            if current_time - time_since_last_search >= 2.0:
+                logger.debug(f"Executing search pattern (step {search_step})")
+
+                # Every 4 steps, do a full 360 look around
+                if search_step % 4 == 0:
+                    self.input.look_around(rotations=8)
+                else:
+                    # Otherwise just rotate and move a bit
+                    self.input.search_pattern(search_step)
+
+                # Update state data
+                self.state_machine.set_state_data('search_step', search_step + 1)
+                self.state_machine.set_state_data('last_search_time', current_time)
+
             logger.debug("Searching for elevator...")
 
     def handle_approaching_elevator(self, screen: np.ndarray):

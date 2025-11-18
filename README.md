@@ -15,6 +15,7 @@ This bot automates elevator usage in The Division 2 Summit mode:
 
 ## ✨ Features
 
+- **Active Search Pattern**: Automatically rotates camera and looks around for elevators
 - **Resolution Independent**: Works at any screen resolution
 - **Window Mode Flexible**: Supports windowed and borderless modes
 - **Computer Vision Based**: Uses only screen capture (no memory reading or game hooks)
@@ -64,12 +65,14 @@ python main.py
 ```
 
 4. The bot will automatically:
-   - Search for the elevator
-   - Approach and enter it
+   - **Actively search** for elevators (rotates camera, looks around)
+   - Approach and enter when found
    - Wait for other players
-   - Exit if someone joins
+   - Exit if someone joins (using `/leave` command)
 
 5. Press `Ctrl+C` to stop the bot
+
+**Note:** The bot uses an active search pattern - it will rotate the camera and move around looking for elevator interaction prompts. For best results, start the bot in the general vicinity of an elevator.
 
 ### Advanced Usage
 
@@ -160,8 +163,8 @@ The bot consists of several modular components:
 ```
 IDLE
   ↓
-SEARCHING_ELEVATOR → Detect elevator prompt
-  ↓
+SEARCHING_ELEVATOR → Actively rotate camera and look for elevator prompt
+  ↓                  (360° rotation every 4 steps, incremental search otherwise)
 APPROACHING_ELEVATOR → Move towards elevator
   ↓
 ENTERING_ELEVATOR → Press interact key
@@ -170,9 +173,9 @@ IN_ELEVATOR → Confirm entry
   ↓
 WAITING_IN_ELEVATOR → Monitor for players
   ↓
-PLAYER_DETECTED → Someone joined
+PLAYER_DETECTED → Someone joined, execute /leave command
   ↓
-EXITING_ELEVATOR → Leave and reset
+EXITING_ELEVATOR → Move out and leave group
   ↓
 (back to SEARCHING_ELEVATOR)
 ```
@@ -201,6 +204,22 @@ When another player joins the elevator, the bot:
 4. Exits the elevator automatically
 
 This ensures clean exit without disrupting other players' gameplay.
+
+### Active Search Pattern
+
+The bot doesn't just wait passively - it actively searches for elevators:
+
+1. **Camera Rotation**: Every 2 seconds, rotates the camera to scan for interaction prompts
+2. **360° Scanning**: Every 4th search step, performs a full 360-degree rotation
+3. **Incremental Movement**: Between full rotations, makes small movements while rotating
+4. **Continuous Detection**: Constantly analyzes screen for orange/yellow elevator prompts
+
+This means you can start the bot in the general area and it will find the elevator, rather than needing to be perfectly positioned.
+
+**Search Behavior:**
+- Step 1-3: Rotate 90° + small forward movement
+- Step 4: Full 360° rotation (8 segments)
+- Repeat
 
 ### No Game Hooks
 

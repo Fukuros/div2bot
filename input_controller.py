@@ -211,6 +211,75 @@ class InputController:
         logger.info("Leaving group via /leave command")
         self.send_chat_command("/leave")
 
+    def move_mouse(self, x: int, y: int):
+        """
+        Move mouse relative to current position.
+
+        Args:
+            x: Horizontal movement (positive = right, negative = left)
+            y: Vertical movement (positive = down, negative = up)
+        """
+        try:
+            if self.use_pydirectinput:
+                pydirectinput.moveRel(x, y, relative=True)
+            else:
+                # Fallback - keyboard module doesn't have mouse control
+                # Would need pyautogui or another library
+                logger.warning("Mouse movement not supported with keyboard module")
+        except Exception as e:
+            logger.error(f"Error moving mouse: {e}")
+
+    def rotate_camera(self, direction: str = "right", amount: int = 100):
+        """
+        Rotate camera left or right.
+
+        Args:
+            direction: 'left' or 'right'
+            amount: How much to rotate (pixels of mouse movement)
+        """
+        if direction == "right":
+            self.move_mouse(amount, 0)
+        elif direction == "left":
+            self.move_mouse(-amount, 0)
+        else:
+            logger.warning(f"Unknown rotation direction: {direction}")
+
+        time.sleep(0.1)
+
+    def look_around(self, rotations: int = 4):
+        """
+        Perform a 360-degree camera rotation to search for objects.
+
+        Args:
+            rotations: Number of rotation segments (default 4 = 90° each)
+        """
+        logger.info(f"Looking around with {rotations} rotations")
+        rotation_amount = 200 // rotations  # Adjust for smoother rotation
+
+        for i in range(rotations):
+            self.rotate_camera("right", rotation_amount)
+            time.sleep(0.3)
+
+    def search_pattern(self, step: int = 0):
+        """
+        Execute a search pattern to find elevators.
+        Combines forward movement with camera rotation.
+
+        Args:
+            step: Current step in the search pattern (for different behaviors)
+        """
+        logger.debug(f"Executing search pattern, step {step}")
+
+        # Rotate 90 degrees
+        self.rotate_camera("right", 150)
+        time.sleep(0.2)
+
+        # Move forward a bit
+        if step % 2 == 0:
+            self.move_forward(0.3)
+
+        time.sleep(0.2)
+
     def emergency_stop(self):
         """Release all keys."""
         logger.info("Emergency stop - releasing all keys")

@@ -28,6 +28,11 @@ movement:
   # How long to wait after leaving elevator
   exit_delay: 1.0
 
+  # Search pattern settings
+  search_rotation_amount: 150  # Mouse pixels to rotate camera
+  search_interval: 2.0  # Seconds between search actions
+  full_rotation_frequency: 4  # Do full 360° every N search steps
+
 # Key Bindings (customize based on your game settings)
 keybinds:
   forward: 'w'
