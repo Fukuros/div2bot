@@ -36,10 +36,18 @@ This bot automates elevator usage in The Division 2 Summit mode:
 
 ### Installing Tesseract OCR
 
+**⚠️ CRITICAL: Tesseract OCR is REQUIRED for accurate operation!**
+
+Without it, the bot cannot read HUD text and will use unreliable color detection.
+
+**Quick Installation:**
+
 **Windows:**
-1. Download the installer from: https://github.com/UB-Mannheim/tesseract/wiki
-2. Run the installer and remember the install path (usually `C:\Program Files\Tesseract-OCR`)
-3. Add Tesseract to your PATH environment variable
+```cmd
+# Download from: https://github.com/UB-Mannheim/tesseract/wiki
+# Install and add to PATH
+# Detailed instructions: See INSTALL_TESSERACT.md
+```
 
 **Linux:**
 ```bash
@@ -50,6 +58,13 @@ sudo apt-get install tesseract-ocr
 ```bash
 brew install tesseract
 ```
+
+**After installing, verify with:**
+```bash
+python check_dependencies.py
+```
+
+See [INSTALL_TESSERACT.md](INSTALL_TESSERACT.md) for detailed step-by-step instructions.
 
 ## 📦 Installation
 
@@ -68,6 +83,18 @@ pip install -r requirements.txt
 
 ### 3. Verify Installation
 
+**Check all dependencies:**
+```bash
+python check_dependencies.py
+```
+
+This will check:
+- Python version
+- Required packages
+- **Tesseract OCR installation** (critical!)
+- Screen capture functionality
+
+**Test the bot:**
 ```bash
 python main.py --help
 ```
