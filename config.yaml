@@ -1,0 +1,61 @@
+# Division 2 Elevator Bot Configuration
+
+# Detection Settings
+detection:
+  # Confidence threshold for template matching (0.0 to 1.0)
+  template_threshold: 0.7
+
+  # How often to capture and analyze screen (in seconds)
+  capture_interval: 0.1
+
+  # Color detection tolerances (HSV)
+  color_tolerance: 10
+
+# Movement Settings
+movement:
+  # Movement key hold duration (seconds)
+  move_duration: 0.5
+
+  # Interaction key hold duration (seconds)
+  interact_duration: 0.2
+
+  # Delay between actions (seconds)
+  action_delay: 0.5
+
+  # How long to wait in elevator before checking for players
+  elevator_wait_time: 2.0
+
+  # How long to wait after leaving elevator
+  exit_delay: 1.0
+
+# Key Bindings (customize based on your game settings)
+keybinds:
+  forward: 'w'
+  backward: 's'
+  left: 'a'
+  right: 'd'
+  interact: 'f'
+  sprint: 'shift'
+  chat: 'enter'  # Key to open chat window
+
+# State Machine Settings
+states:
+  # Maximum time to spend in a state before timeout (seconds)
+  max_state_time: 30
+
+  # Number of consecutive detections needed to confirm state
+  confirmation_frames: 3
+
+# Debug Settings
+debug:
+  # Enable debug mode (shows detection windows)
+  enabled: false
+
+  # Save screenshots of detections
+  save_screenshots: false
+
+  # Screenshot save directory
+  screenshot_dir: './debug_screenshots'
+
+  # Logging level (DEBUG, INFO, WARNING, ERROR)
+  log_level: 'INFO'
